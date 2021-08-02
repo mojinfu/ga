@@ -40,18 +40,20 @@ func newDNAWithRandSort(this []int) []int {
 	}
 	return out
 }
-func SimpleOrderMuta(dnai []int, mutaP float64) {
+func SimpleOrderMuta(a *DNAIAndFitness, mutaP float64) {
 	// newDnai := make([]int, dnai.Len())
 	// for index := 0; index < dnai.Len(); index++ {
 	// 	newDnai[index] = dnai.GetDNAI(index)
 	// }
 	var newIndex int
-	for index := 0; index < len(dnai); index++ {
+	for index := 0; index < len(a.dnai); index++ {
 		if rand.Float64() < mutaP {
-			newIndex = rand.Intn(len(dnai)-index) + index
-			dnai[index], dnai[newIndex] = dnai[newIndex], dnai[index]
+			newIndex = rand.Intn(len(a.dnai)-index) + index
+			a.dnai[index], a.dnai[newIndex] = a.dnai[newIndex], a.dnai[index]
 		}
 	}
+	a.fitness = nil
+	a.out = nil
 	return
 }
 
