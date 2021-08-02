@@ -1,4 +1,4 @@
-package sd_packing
+package ga
 
 import (
 	"math/rand"
