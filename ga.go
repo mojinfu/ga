@@ -86,6 +86,13 @@ func (this *DNAIAndFitness) SetOut(a interface{}) {
 func (this *DNAIAndFitness) GetDNAI(i int) int {
 	return this.dnai[i]
 }
+func (this *DNAIAndFitness) GetFitness(i int) float64 {
+	if this.fitness == nil {
+		return 0
+	} else {
+		return *this.fitness
+	}
+}
 func (this *DNAIAndFitness) Len() int {
 	return len(this.dnai)
 }
