@@ -1,4 +1,4 @@
-package ga
+package sd_packing
 
 import (
 	"math/rand"
@@ -6,55 +6,125 @@ import (
 	"time"
 )
 
-type DNA interface {
-	OrderMuta() DNA
+type GeneAlgoInterface interface {
+	// OrderMuta(*DNAIAndFitness)
+	OrderMuta(*DNAIAndFitness)
 	NodeMuta(int)
-
-	Fitness() float64
+	Fitness(*DNAIAndFitness) float64
 	Len() int
-	Get(int) interface{}
-	Key(int) string
-	Set(int, interface{})
-	Copy() DNA
+	// Get(int) interface{}
+	// Key(int) string
+	// Set(int, interface{})
+	// Copy() GeneAlgoInterface
 }
+
+// type DNAI interface {
+// 	SetOut(a interface{})
+// 	GetDNAI(i int) int
+// 	Len() int
+// }
 
 var iii int
 
-func newDNAWithRandSort(this DNA) DNA {
+func newDNAWithRandSort(this []int) []int {
 	iii++
-	newDna := this.Copy()
-	for index := 0; index < newDna.Len(); index++ {
-		newIndex := rand.Intn(newDna.Len()-index) + index
-		newIndexNode := newDna.Get(newIndex)
-		newDna.Set(newIndex, newDna.Get(index))
-		newDna.Set(index, newIndexNode)
+	out := make([]int, len(this))
+	copy(out, this)
+	for index := 0; index < len(out); index++ {
+		newIndex := rand.Intn(len(out)-index) + index
+		out[index], out[newIndex] = out[newIndex], out[index]
+		// newIndexNode := newDna.Get(newIndex)
+		// newDna.Set(newIndex, newDna.Get(index))
+		// newDna.Set(index, newIndexNode)
 		//	check(newDna)
 	}
-	return newDna
+	return out
 }
-func SimpleOrderMuta(dna DNA, mutaP float64) DNA {
-	newDna := dna.Copy()
-	for index := 0; index < newDna.Len(); index++ {
+func SimpleOrderMuta(dnai []int, mutaP float64) {
+	// newDnai := make([]int, dnai.Len())
+	// for index := 0; index < dnai.Len(); index++ {
+	// 	newDnai[index] = dnai.GetDNAI(index)
+	// }
+	var newIndex int
+	for index := 0; index < len(dnai); index++ {
 		if rand.Float64() < mutaP {
-			newIndex := rand.Intn(newDna.Len()-index) + index
-			newIndexNode := newDna.Get(newIndex)
-			newDna.Set(newIndex, newDna.Get(index))
-			newDna.Set(index, newIndexNode)
+			newIndex = rand.Intn(len(dnai)-index) + index
+			dnai[index], dnai[newIndex] = dnai[newIndex], dnai[index]
 		}
 	}
-	return newDna
+	return
 }
 
-func (this *GA) GA(dna DNA) (best DNA) {
-	endAt := time.Now().Add(this.stopTrigger.timeLimit)
-	dnaList := []DNA{dna}
-	var bestFitness float64 = dnaList[0].Fitness()
-	best = dnaList[0]
-	for len(dnaList) < this.initialPopulationNum {
-		dnaList = append(dnaList, newDNAWithRandSort(dna))
+// func SimpleOrderMuta(dnai []int, mutaP float64) []int {
+// 	newDnai := make([]int, len(dnai))
+// 	for index := 0; index < len(dnai); index++ {
+// 		newDnai[index] = dnai[index]
+// 	}
+// 	for index := 0; index < len(dnai); index++ {
+// 		if rand.Float64() < mutaP {
+// 			newIndex := rand.Intn(len(newDnai)-index) + index
+// 			newDnai[index], newDnai[newIndex] = newDnai[newIndex], newDnai[index]
+// 		}
+// 	}
+// 	return newDnai
+// }
+
+type DNAIAndFitness struct {
+	dnai    []int
+	fitness *float64
+	out     interface{}
+}
+
+func (this *DNAIAndFitness) GetOut() interface{} {
+	return this.out
+}
+func (this *DNAIAndFitness) SetOut(a interface{}) {
+	this.out = a
+}
+func (this *DNAIAndFitness) GetDNAI(i int) int {
+	return this.dnai[i]
+}
+func (this *DNAIAndFitness) Len() int {
+	return len(this.dnai)
+}
+func newDnaiAndFitness(a []int) *DNAIAndFitness {
+	return &DNAIAndFitness{
+		dnai:    a,
+		fitness: nil,
 	}
-	this.logGen(dnaList)
-	for i := 0; i < this.stopTrigger.genNum; i++ {
+}
+
+func (this *GA) Fitness(a *DNAIAndFitness) float64 {
+	if a.fitness != nil {
+		return *a.fitness
+	} else {
+		f := this.geneBank.Fitness(a)
+		a.fitness = &f
+		return *a.fitness
+	}
+}
+func (this *GA) GA(bank GeneAlgoInterface) *DNAIAndFitness {
+	this.initDNALength = bank.Len()
+	this.geneBank = bank
+	endAt := time.Now().Add(this.stopTrigger.timeLimit)
+	initDnai := []int{}
+	for i := 0; i < bank.Len(); i++ {
+		initDnai = append(initDnai, i)
+	}
+	dnaList := []*DNAIAndFitness{
+		{
+			dnai:    initDnai,
+			fitness: nil,
+		},
+	}
+
+	var bestFitness float64 = bank.Fitness(dnaList[0])
+	best := dnaList[0]
+	for len(dnaList) < this.initialPopulationNum {
+		dnaList = append(dnaList, newDnaiAndFitness(newDNAWithRandSort(best.dnai)))
+	}
+	// this.logGen(dnaList)
+	for this.genNum = 1; this.genNum < this.stopTrigger.genNum; this.genNum++ {
 		//cross
 		if this.stopTrigger.timeLimit > 0 && endAt.Before(time.Now()) {
 			break
@@ -62,23 +132,38 @@ func (this *GA) GA(dna DNA) (best DNA) {
 		afterCross := this.cross(dnaList)
 		this.muta(afterCross)
 		better := this.keepBetterDNA(dnaList)
-		bestFitness = better[0].Fitness()
-		best = better[0]
+		bestFitness = this.Fitness(better[0])
+		// best = better[0]
+		if this.Fitness(better[0]) > this.Fitness(best) {
+			best = better[0]
+		}
+		// fmt.Println(this.genNum, "   this.fitness-->", this.Fitness(best), "------", this.Fitness(better[0]))
 		if this.stopTrigger.bestFitnesstReach != nil && bestFitness >= *this.stopTrigger.bestFitnesstReach {
 			break
 		}
-		newGen := []DNA{}
+		newGen := []*DNAIAndFitness{}
 		for len(newGen) < this.initialPopulationNum-len(better) {
-			newGen = append(newGen, pickOne(afterCross))
+			newGen = append(newGen, this.pickOne(afterCross))
 		}
-		newGen = append(newGen, better...)
+		// sed := (float64(this.genNum) / float64(this.stopTrigger.genNum))
+		var sed int = 10
+		if this.genNum%sed == 0 {
+			if sed != 1 {
+				sed--
+			}
+			newGen = append(newGen, better...)
+		}
+		if float64(this.genNum) > 0.2*float64(this.stopTrigger.genNum) {
+			newGen = append(newGen, best)
+		}
 		dnaList = newGen
-		this.logGen(dnaList)
+		// this.logGen(dnaList)
 	}
 	return best
 }
 
 type GA struct {
+	initDNALength        int
 	initialPopulationNum int
 	genealogy            genealogyStruct
 	pepoleMutaP          float64
@@ -86,9 +171,12 @@ type GA struct {
 	recordGenealogy      bool
 	stopTrigger          stopTrigger
 	Counter              Counter
+	geneBank             GeneAlgoInterface
+
+	genNum int
 }
 type genealogyStruct struct {
-	dnaG            [][]DNA
+	dnaG            [][]GeneAlgoInterface
 	bestFitnessList []float64
 }
 type Counter struct {
@@ -103,6 +191,8 @@ type stopTrigger struct {
 
 func NewGA() *GA {
 	return &GA{
+		// initDNA
+		initDNALength:        -1,
 		initialPopulationNum: 30,
 		pepoleMutaP:          0.2,
 		pepoleNodeMutaP:      0.2,
@@ -111,7 +201,12 @@ func NewGA() *GA {
 			genNum:            30,
 			bestFitnesstReach: nil,
 		},
+		genNum: 0,
 	}
+}
+
+func (this *GA) SetPepoleMutaP(a float64) {
+	this.pepoleMutaP = a
 }
 func (this *GA) FitnessGenealogy() []float64 {
 	return this.genealogy.bestFitnessList
@@ -128,43 +223,63 @@ func (this *GA) SetMaxGenerNum(m int) {
 func (this *GA) IfRecordGenealogy(r bool) {
 	this.recordGenealogy = r
 }
-func (this *GA) logGen(dnaList []DNA) {
-	if len(dnaList) < 0 {
-		panic("")
-	}
-	this.Counter.genNum++
-	if this.recordGenealogy {
-		this.genealogy.dnaG = append(this.genealogy.dnaG, dnaList)
-	}
-	this.genealogy.bestFitnessList = append(this.genealogy.bestFitnessList, dnaList[0].Fitness())
+func (this *GA) GetGenNum() int {
+	return this.genNum
+}
+func (this *GA) GetGenNumLimit() int {
+	return this.stopTrigger.genNum
 }
 
-type sortDNAList []DNA
+// func (this *GA) logGen(dnaList []*DNAIAndFitness) {
+// 	if len(dnaList) < 0 {
+// 		panic("")
+// 	}
+// 	this.Counter.genNum++
+// 	if this.recordGenealogy {
+// 		this.genealogy.dnaG = append(this.genealogy.dnaG, dnaList)
+// 	}
+// 	this.genealogy.bestFitnessList = append(this.genealogy.bestFitnessList, dnaList[0].Fitness())
+// }
+
+type sortDNAList struct {
+	list []*DNAIAndFitness
+	ga   *GA
+}
 
 func (this sortDNAList) Less(a, b int) bool {
-	return this[a].Fitness() > this[b].Fitness()
+	return this.ga.Fitness(this.list[a]) > this.ga.Fitness(this.list[b])
 }
 func (this sortDNAList) Swap(a, b int) {
-	this[a], this[b] = this[b], this[a]
+	this.list[a], this.list[b] = this.list[b], this.list[a]
 }
 func (this sortDNAList) Len() int {
-	return len(this)
+	return len(this.list)
 }
-func (this *GA) keepBetterDNA(dnaList []DNA) []DNA {
-	sort.Sort(sortDNAList(dnaList))
-	var newGen []DNA
+func (this *GA) keepBetterDNA(dnaList []*DNAIAndFitness) []*DNAIAndFitness {
+	sort.Sort(sortDNAList{
+		list: dnaList,
+		ga:   this,
+	})
+	var newGen []*DNAIAndFitness
 	for i := 0; i < 1+len(dnaList)/10 && i < len(dnaList); i++ {
 		newGen = append(newGen, dnaList[i])
 	}
 	return newGen
 }
-func (this *GA) cross(dnaList []DNA) []DNA {
-	sort.Sort(sortDNAList(dnaList))
-	var newGen []DNA
+func (this *GA) cross(dnaList []*DNAIAndFitness) []*DNAIAndFitness {
+	sort.Sort(sortDNAList{
+		list: dnaList,
+		ga:   this,
+	})
+	var newGen []*DNAIAndFitness
 	for {
 		if len(newGen) < int(float64(len(dnaList))*1.5) {
-			t := pickTwoDifferent(dnaList)
-			newGen = append(newGen, crossAAndB(t[0], t[1])...)
+			t := this.pickTwoDifferent_old(dnaList)
+			list := crossAAndB(t[0].dnai, t[1].dnai)
+			for i := range list {
+				newGen = append(newGen, newDnaiAndFitness(list[i]))
+			}
+
 		} else {
 			break
 		}
@@ -172,39 +287,33 @@ func (this *GA) cross(dnaList []DNA) []DNA {
 	return newGen
 }
 
-func check(a DNA) {
-	unionMap := make(map[string]bool)
-	for i := 0; i < a.Len(); i++ {
-		_, isOK := unionMap[a.Key(i)]
-		if !isOK {
-			unionMap[a.Key(i)] = true
-		} else {
-			panic("")
-		}
-	}
-}
-func crossAAndB(a, b DNA) []DNA {
-	var c DNA = a.Copy()
-	unionMap := make(map[string]bool)
-	bitset := make([]bool, a.Len())
+var corssRank int
 
-	for i := 0; i < a.Len(); i++ {
+func crossAAndB(a, b []int) [][]int {
+	// a.(*baseInfoDNAi).CC()
+	// b.(*baseInfoDNAi).CC()
+	corssRank++
+	var c []int = make([]int, len(a))
+	unionMap := make(map[int]bool)
+	bitset := make([]bool, len(a))
+
+	for i := 0; i < len(a); i++ {
 		if rand.Float64() > 0.5 {
-			c.Set(i, a.Get(i))
-			unionMap[a.Key(i)] = true
+			c[i] = a[i] //c.Set(i, a.Get(i)) //
+			unionMap[a[i]] = true
 			bitset[i] = true
 		}
 	}
 	bi := 0
-	for ci := 0; ci < a.Len(); ci++ {
+	for ci := 0; ci < len(a); ci++ {
 		if bitset[ci] {
 			continue
 		}
-		for bi < b.Len() {
-			_, isOK := unionMap[b.Key(bi)]
+		for bi < len(b) {
+			_, isOK := unionMap[b[bi]]
 			if !isOK {
-				unionMap[b.Key(bi)] = true
-				c.Set(ci, b.Get(bi))
+				unionMap[b[bi]] = true
+				c[ci] = b[bi]
 				bi++
 				break
 			} else {
@@ -212,39 +321,91 @@ func crossAAndB(a, b DNA) []DNA {
 			}
 		}
 	}
+	//for i := range newGen {
+	// fmt.Println("corssRank:", corssRank)
+	//	c.(*baseInfoDNAi).CC()
+	//}
 	//	check(c)
-	return []DNA{c}
+	return [][]int{c}
 
 }
-func (this *GA) muta(dnaList []DNA) {
-	sort.Sort(sortDNAList(dnaList))
-	for i := 0; i < len(dnaList); i++ {
-		if i < 1+len(dnaList)/5 {
+func (this *GA) muta(dnaiList []*DNAIAndFitness) {
+	sort.Sort(sortDNAList{
+		list: dnaiList,
+		ga:   this,
+	})
+	for i := 0; i < len(dnaiList); i++ {
+		if i < 1+len(dnaiList)/5 {
 			continue
 		}
 		if rand.Float64() < this.pepoleMutaP {
 			this.Counter.Muta++
-			dnaList[i] = dnaList[i].OrderMuta()
+			this.geneBank.OrderMuta(dnaiList[i]) //todo
+			dnaiList[i].fitness = nil
+			dnaiList[i].out = nil
 		}
 	}
 }
 
-func pickOne(dnaList []DNA) DNA {
+func (this *GA) pickOne(dnaList []*DNAIAndFitness) *DNAIAndFitness {
 	a := dnaList[rand.Intn(len(dnaList))]
 	b := dnaList[rand.Intn(len(dnaList))]
-	if a.Fitness() > b.Fitness() {
+
+	if this.Fitness(a) > this.Fitness(b) {
 		return a
 	} else {
 		return b
 	}
 }
 
-func pickTwoDifferent(dnaList []DNA) [2]DNA {
+func (this *GA) pickTwoDifferent(dnaList []*DNAIAndFitness) [2]*DNAIAndFitness {
 	if len(dnaList) < 2 {
 		panic("")
 	}
 	if len(dnaList) == 2 {
-		return [2]DNA{dnaList[0], dnaList[1]}
+		return [2]*DNAIAndFitness{dnaList[0], dnaList[1]}
+	}
+	l := len(dnaList)
+	var a, b, c int
+	a = rand.Intn(l)
+	bI := rand.Intn(l-2) + 1
+	b = (a + bI) % l
+	abs := a - b
+	if abs < 0 {
+		abs = -abs
+	}
+	if a-b == 1 || b-a == 1 {
+		return [2]*DNAIAndFitness{dnaList[a], dnaList[b]}
+	}
+	cI := rand.Intn(abs-1) + 1
+	if a < b {
+		c = a + cI
+	} else {
+		c = b + cI
+	}
+
+	// for {
+	// 	c = rand.Intn(l)
+	// 	if c != a && c != b {
+	// 		break
+	// 	}
+	// }
+	temp := []*DNAIAndFitness{dnaList[a], dnaList[b], dnaList[c]}
+	sort.Sort(sortDNAList{
+		list: temp,
+		ga:   this,
+	})
+	return [2]*DNAIAndFitness{temp[0], temp[1]}
+
+	//return [2]*DNAIAndFitness{dnaList[a], dnaList[b]}
+}
+
+func (this *GA) pickTwoDifferent_old(dnaList []*DNAIAndFitness) [2]*DNAIAndFitness {
+	if len(dnaList) < 2 {
+		panic("")
+	}
+	if len(dnaList) == 2 {
+		return [2]*DNAIAndFitness{dnaList[0], dnaList[1]}
 	}
 	var a, b, c int
 	a = rand.Intn(len(dnaList))
@@ -261,7 +422,10 @@ func pickTwoDifferent(dnaList []DNA) [2]DNA {
 			break
 		}
 	}
-	temp := []DNA{dnaList[a], dnaList[b], dnaList[c]}
-	sort.Sort(sortDNAList(temp))
-	return [2]DNA{temp[0], temp[1]}
+	temp := []*DNAIAndFitness{dnaList[a], dnaList[b], dnaList[c]}
+	sort.Sort(sortDNAList{
+		list: temp,
+		ga:   this,
+	})
+	return [2]*DNAIAndFitness{temp[0], temp[1]}
 }
