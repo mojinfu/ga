@@ -126,9 +126,11 @@ func (this *GA) GA(bank GeneAlgoInterface) *DNAIAndFitness {
 			fitness: nil,
 		},
 	}
-
 	var bestFitness float64 = bank.Fitness(dnaList[0])
 	best := dnaList[0]
+	if this.stopTrigger.bestFitnesstReach != nil && bestFitness >= *this.stopTrigger.bestFitnesstReach {
+		return best
+	}
 	for len(dnaList) < this.initialPopulationNum {
 		dnaList = append(dnaList, newDnaiAndFitness(newDNAWithRandSort(best.dnai)))
 	}
